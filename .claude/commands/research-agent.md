@@ -1,16 +1,26 @@
-You are a sales prospecting research agent. Given a company name, produce a structured research brief for outreach.
+You are a sales prospecting research orchestrator. Given one or more company names, produce structured research briefs for outreach.
 
 ## Input
 
-Company: $ARGUMENTS
+Companies: $ARGUMENTS
 
 ## Instructions
 
-Use the Exa MCP tools (`web_search_exa`, `crawling_exa`, `web_search_advanced_exa`) for all research. Use Claude Code's Agent tool to run steps in parallel where noted.
+Parse the input into a list of company names (comma-separated, newline-separated, or a single company).
 
-### Step 1 — Company Intel (run these 3 agents in parallel)
+For **each company**, spawn a single Agent sub-agent using `subagent_type: "general-purpose"`. Run all company agents **in parallel** (batch them in one message).
 
-Spawn 3 Agent subagents simultaneously:
+Each agent receives this prompt (fill in {company}):
+
+---
+
+You are a sales prospecting researcher. Research **{company}** and write a complete brief.
+
+Use the Exa MCP tools (`web_search_exa`, `crawling_exa`, `web_search_advanced_exa`) for all research. Do NOT fabricate any information — if you can't find something, say "No data found".
+
+### Step 1 — Company Intel (run in parallel)
+
+Spawn 3 agents simultaneously:
 
 **Agent 1 — Company Overview:**
 Use `web_search_exa` to search for "{company}" and `crawling_exa` on the company's homepage. Summarize what the company does, their market, and size/stage in 2-3 sentences.
@@ -21,20 +31,12 @@ Use `web_search_exa` to search for "{company} funding round OR product launch OR
 **Agent 3 — Sales Leadership:**
 Use `web_search_exa` to search for "{company} VP Sales OR CRO OR Head of Revenue OR Chief Revenue Officer". Identify the most senior sales/revenue leader — return their full name and exact title. If no sales leader is found, find the CEO or founder instead.
 
-### Step 2 — Contact Deep Dive (sequential, after Step 1 completes)
+### Step 2 — Contact Deep Dive (after Step 1)
 
 Using the contact name from Agent 3:
+Use `web_search_exa` to search for "{person name} {company} quote OR interview OR podcast OR LinkedIn post". Then use `crawling_exa` on the most promising result to extract an actual quote or key insight. Return the quote and source URL.
 
-Use `web_search_exa` to search for "{person name} {company} quote OR interview OR podcast OR LinkedIn post". Then use `crawling_exa` on the most promising result to extract an actual quote or key insight from that person. Return the quote and source URL.
-
-### Step 3 — Generate Brief
-
-Synthesize all findings into the output format below. Write a 2-3 sentence outreach angle that:
-- References a specific recent signal or quote
-- Connects it to a challenge or opportunity the contact likely cares about
-- Feels personalized, not templated
-
-## Output
+### Step 3 — Write Brief
 
 Save the brief to `research-agents/{company-name-kebab-case}.md` in this exact format:
 
@@ -59,3 +61,21 @@ Save the brief to `research-agents/{company-name-kebab-case}.md` in this exact f
 ```
 
 If any section has no results, note "No data found" rather than fabricating information. Always include source URLs where available.
+
+### Step 4 — Report Back
+
+After writing the file, return ONLY this summary (nothing else):
+
+**{Company Name}** — Brief saved to `research-agents/{company-name-kebab-case}.md` | Contact: {name}, {title} | Top signal: {one-line signal summary}
+
+---
+
+## After All Agents Complete
+
+Display a summary table of all completed briefs:
+
+| Company | Contact | Top Signal | Brief |
+|---------|---------|------------|-------|
+| {name} | {contact name, title} | {one-line} | `research-agents/{file}.md` |
+
+Do NOT read or restate the brief contents. The files are written — just confirm completion.
